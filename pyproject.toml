@@ -1,7 +1,7 @@
 [project]
 name = "mostlyai"
 version = "4.0.2"
-description = "MOSTLY AI - Python Client"
+description = "Synthetic Data SDK"
 authors = [{ name = "MOSTLY AI", email = "dev@mostly.ai" }]
 requires-python = ">=3.10,<3.13"
 readme = "README.md"
@@ -121,9 +121,9 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://app.mostly.ai/"
-Documentation = "https://mostly-ai.github.io/mostlyai/"
-Source = "https://github.com/mostly-ai/mostlyai"
+homepage = "https://app.mostly.ai/"
+repository = "https://github.com/mostly-ai/mostlyai"
+documentation = "https://mostly-ai.github.io/mostlyai/"
 
 [tool.uv]
 default-groups = ["dev", "docs"]
