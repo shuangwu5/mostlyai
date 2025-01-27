@@ -31,6 +31,7 @@ from mostlyai.sdk._local.generators import create_generator as create_generator_
 from mostlyai.sdk._local import connectors
 from mostlyai.sdk.domain import (
     AboutService,
+    ConnectorType,
     CurrentUser,
     Generator,
     GeneratorPatchConfig,
@@ -321,6 +322,23 @@ class Routes:
         async def clone_generator(id: str, config: GeneratorCloneConfig = Body(...)) -> Generator:
             generator_dir = self.home_dir / "generators" / id
             generator = read_generator_from_json(generator_dir)
+            connector_dirs = [
+                self.home_dir / "connectors" / t.source_connector_id
+                for t in generator.tables
+                if t.source_connector_id  # if generator is imported, source_connector_id will be None
+            ]
+            # check if all connectors exist
+            connector_dirs = [c for c in connector_dirs if c.is_dir()]
+            if len(connector_dirs) < len(generator.tables):
+                raise HTTPException(
+                    status_code=400,
+                    detail="One or more connectors not found. File upload connectors are deleted after training and generation.",
+                )
+
+            # check if any connectors are file upload
+            if any(read_connector_from_json(c).type == ConnectorType.file_upload for c in connector_dirs):
+                raise HTTPException(status_code=400, detail="Cannot clone a generator with uploaded files.")
+
             new_generator = create_generator_model(
                 home_dir=self.home_dir, config=GeneratorConfig(**generator.model_dump())
             )
