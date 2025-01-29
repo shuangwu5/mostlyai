@@ -11,7 +11,8 @@ cd ..
 
 git clone https://github.com/vllm-project/vllm.git
 source .venv/bin/activate
-uv pip install /opt/rocm/share/amd_smi setuptools_scm numba
+uv pip install /opt/rocm/share/amd_smi
+uv pip install setuptools_scm numba
 cd vllm
 uv pip install -r requirements-rocm.txt
 PYTORCH_ROCM_ARCH="gfx90a;gfx942" python setup.py develop
