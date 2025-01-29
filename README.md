@@ -28,7 +28,7 @@ The SDK allows you to programmatically create, browse and manage 3 key resources
 
 ## (Experimental) Installation of development version for AMD GPUs (ROCm)
 
-**Prerequisites: install `uv`**
+**Prerequisites: install [uv](https://docs.astral.sh/uv/) package manager**
 
 ```shell
 curl -LsSf https://astral.sh/uv/install.sh | sh
