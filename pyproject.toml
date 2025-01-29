@@ -51,8 +51,8 @@ dependencies = [
     "xlsxwriter>=3.1.9,<4",
     "openpyxl>=3.1.5",
     # cloud-based connectors
-    "s3fs>=2023.1.0,<2024",
-    "gcsfs>=2023.1.0,<2024",
+    "s3fs>=2024.9.0,<2025",
+    "gcsfs>=2024.9.0,<2025",
     "cloudpathlib[gs, s3, azure]>=0.17.0,<0.18",
     "smart-open[gcs, s3, azure]>=6.3.0,<7",
     "azure-storage-blob>=12.16.0,<13",
@@ -61,30 +61,38 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-local = [
-    # local
-    "mostlyai-engine==1.0.2",
+local-rocm = [
+    "mostlyai-engine",
     "mostlyai-qa==1.5.1",
     "fastapi>=0.115.6,<0.116",
     "uvicorn>=0.34.0,<0.35",
     "python-multipart>=0.0.20",
+    "torch>=2.5.1,<2.6",
 ]
-local-gpu = [
-    "mostlyai-engine[gpu]==1.0.2",
-    "mostlyai-qa==1.5.1",
-    "fastapi>=0.115.6,<0.116",
-    "uvicorn>=0.34.0,<0.35",
-    "python-multipart>=0.0.20",
-    "torch>=2.5.1",
-]
-local-cpu = [
-    "mostlyai-engine[cpu]==1.0.2",
-    "mostlyai-qa==1.5.1",
-    "fastapi>=0.115.6,<0.116",
-    "uvicorn>=0.34.0,<0.35",
-    "python-multipart>=0.0.20",
-    "torch>=2.5.1",
-]
+# local = [
+#     # local
+#     "mostlyai-engine==1.0.2",
+#     "mostlyai-qa==1.5.1",
+#     "fastapi>=0.115.6,<0.116",
+#     "uvicorn>=0.34.0,<0.35",
+#     "python-multipart>=0.0.20",
+# ]
+# local-gpu = [
+#     "mostlyai-engine[gpu]==1.0.2",
+#     "mostlyai-qa==1.5.1",
+#     "fastapi>=0.115.6,<0.116",
+#     "uvicorn>=0.34.0,<0.35",
+#     "python-multipart>=0.0.20",
+#     "torch>=2.5.1",
+# ]
+# local-cpu = [
+#     "mostlyai-engine[cpu]==1.0.2",
+#     "mostlyai-qa==1.5.1",
+#     "fastapi>=0.115.6,<0.116",
+#     "uvicorn>=0.34.0,<0.35",
+#     "python-multipart>=0.0.20",
+#     "torch>=2.5.1",
+# ]
 # connectors
 databricks = ["databricks-sql-connector>=3.2.0,<4"]
 googlebigquery = ["sqlalchemy-bigquery>=1.6.1,<2"]
@@ -128,21 +136,24 @@ documentation = "https://mostly-ai.github.io/mostlyai/"
 
 [tool.uv]
 default-groups = ["dev", "docs"]
-conflicts = [
-  [
-    { extra = "local-cpu" },
-    { extra = "local-gpu" },
-  ],
-]
+# conflicts = [
+#   [
+#     { extra = "local-cpu" },
+#     { extra = "local-gpu" },
+#   ],
+# ]
 
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.1"
 explicit = true
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cpu", extra = "local-cpu"},
+  { index = "pytorch-rocm", extra = "local-rocm"},
+]
+mostlyai-engine = [
+  { git = "https://github.com/mostly-ai/mostlyai-engine.git", branch = "rocm-support", extra = "local-rocm" },
 ]
 
 [tool.hatch.build.targets.sdist]
