@@ -26,30 +26,23 @@ The SDK allows you to programmatically create, browse and manage 3 key resources
 | Live probe the generator on demand            | `df = mostly.probe(g, config)`    | see [mostly.probe](https://mostly-ai.github.io/mostlyai/api_client/#mostlyai.sdk.client.api.MostlyAI.probe)       |
 | Connect to any data source within your org    | `c = mostly.connect(config)`      | see [mostly.connect](https://mostly-ai.github.io/mostlyai/api_client/#mostlyai.sdk.client.api.MostlyAI.connect)   |
 
-## Installation
+## (Experimental) Installation of development version for AMD GPUs (ROCm)
 
-**Client mode only**
+**Prerequisites: install `uv`**
 
 ```shell
-pip install -U mostlyai
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
 ```
 
-**Client + Local mode**
+**Create the project environment**
 
 ```shell
-pip install -U 'mostlyai[local]'       # for CPU
-#pip install -U 'mostlyai[local-gpu]'  # for GPU
-```
-
-NOTE: installing `mostlyai[local]` on Linux requires `--extra-index-url https://download.pytorch.org/whl/cpu` to be specified.
-
-**Optional Connectors**
-
-Add any of the following extras for further data connectors support: `databricks`, `googlebigquery`, `hive`, `mssql`, `mysql`, `oracle`, `postgres`, `snowflake`.
-
-E.g.
-```shell
-pip install -U 'mostlyai[local, databricks, snowflake]'
+git clone https://github.com/mostly-ai/mostlyai.git
+cd mostlyai
+git checkout rocm-support
+uv sync --frozen --extra local-rocm
+source install_bnb_vllm_rocm.sh
 ```
 
 ## Quick Start  [![Run on Colab](https://img.shields.io/badge/Open%20in-Colab-blue?logo=google-colab)](https://colab.research.google.com/github/mostly-ai/mostlyai/blob/main/docs/tutorials/getting-started/getting-started.ipynb)
