@@ -42,6 +42,7 @@ git clone https://github.com/mostly-ai/mostlyai.git
 cd mostlyai
 git checkout rocm-support
 uv sync --frozen --extra local-rocm
+# build bitsandbytes and vllm from source as there're no pre-built ROCm wheels
 source install_bnb_vllm_rocm.sh
 ```
 
