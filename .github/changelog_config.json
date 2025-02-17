@@ -1,7 +1,7 @@
 {
   "template": "# What's Changed\n\n#{{CHANGELOG}}\n\n**Full Changelog**: [#{{FROM_TAG}}...#{{TO_TAG}}](#{{RELEASE_DIFF}})",
   "pr_template": "- #{{TITLE}} [##{{NUMBER}}](#{{URL}})",
-  "empty_template": "# No Changes",
+  "empty_template": "No Changes",
   "categories": [
     {
       "title": "## 🚀 Features",
