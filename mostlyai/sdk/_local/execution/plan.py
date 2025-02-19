@@ -14,11 +14,13 @@
 
 from pydantic import BaseModel, Field, ConfigDict
 from collections import deque
-from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType
+from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType, ModelType
 import uuid
 
-TABULAR_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith("TABULAR")] + [ModelEncodingType.auto]
-LANGUAGE_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith("LANGUAGE")]
+TABULAR_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith(ModelType.tabular)] + [
+    ModelEncodingType.auto
+]
+LANGUAGE_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith(ModelType.language)]
 
 TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.pull_training_data,
@@ -107,9 +109,10 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
             execution_plan.add_task(TaskType.train_tabular, parent=sync_task, target_table_name=table.name)
         if has_language_model(table):
             execution_plan.add_task(TaskType.train_language, parent=sync_task, target_table_name=table.name)
-    post_training_sync = execution_plan.add_task(TaskType.sync)
-    finalize_task = execution_plan.add_task(TaskType.finalize_training, parent=post_training_sync)
-    execution_plan.add_task(TaskType.sync, parent=finalize_task)
+    execution_plan.add_task(TaskType.sync)
+    # post_training_sync = execution_plan.add_task(TaskType.sync)
+    # finalize_task = execution_plan.add_task(TaskType.finalize_training, parent=post_training_sync)
+    # execution_plan.add_task(TaskType.sync, parent=finalize_task)
     return execution_plan
 
 

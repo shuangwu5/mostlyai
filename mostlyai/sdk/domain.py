@@ -476,6 +476,10 @@ class RareCategoryReplacementMethod(str, Enum):
 
 
 class TaskType(str, Enum):
+    """
+    The type of the task.
+    """
+
     sync = "SYNC"
     train_tabular = "TRAIN_TABULAR"
     train_language = "TRAIN_LANGUAGE"
@@ -489,6 +493,10 @@ class TaskType(str, Enum):
 
 
 class StepCode(str, Enum):
+    """
+    The unique code for the step.
+    """
+
     pull_training_data = "PULL_TRAINING_DATA"
     analyze_training_data = "ANALYZE_TRAINING_DATA"
     encode_training_data = "ENCODE_TRAINING_DATA"
@@ -500,6 +508,7 @@ class StepCode(str, Enum):
     create_data_report = "CREATE_DATA_REPORT"
     finalize_generation = "FINALIZE_GENERATION"
     deliver_data = "DELIVER_DATA"
+    finalize_probing = "FINALIZE_PROBING"
 
 
 class ProgressValue(CustomBaseModel):
@@ -1008,9 +1017,10 @@ class ModelEncodingType(str, Enum):
     - `TABULAR_DATETIME`: Model samples each part of a datetime value.
     - `TABULAR_DATETIME_RELATIVE`: Model samples the relative difference between datetimes within a sequence.
     - `TABULAR_LAT_LONG`: Model samples a latitude-longitude column. The format is "latitude,longitude".
-    - `LANGUAGE_TEXT`: Model will train a distinct LANGUAGE model for this column, to then generate free text.
-
-    Encoding types, that are not being prefixed with either `TABULAR` or `LANGUAGE` have been deprecated.
+    - `LANGUAGE_TEXT`: Model will sample free text, using a LANGUAGE model.
+    - `LANGUAGE_CATEGORICAL`: Model samples from existing (non-rare) categories, using a LANGUAGE model.
+    - `LANGUAGE_NUMERIC`: Model samples from the valid numeric value range, using a LANGUAGE model.
+    - `LANGUAGE_DATETIME`: Model samples from the valid datetime value range, using a LANGUAGE model.
 
     """
 
@@ -1025,6 +1035,9 @@ class ModelEncodingType(str, Enum):
     tabular_datetime_relative = "TABULAR_DATETIME_RELATIVE"
     tabular_lat_long = "TABULAR_LAT_LONG"
     language_text = "LANGUAGE_TEXT"
+    language_categorical = "LANGUAGE_CATEGORICAL"
+    language_numeric = "LANGUAGE_NUMERIC"
+    language_datetime = "LANGUAGE_DATETIME"
 
 
 class RebalancingConfig(CustomBaseModel):
@@ -2159,8 +2172,8 @@ class SourceTableConfig(CustomBaseModel):
                 keys.append(values.primary_key)
             model_columns = [c for c in values.columns if c.name not in keys]
             enc_types = [c.model_encoding_type or ModelEncodingType.auto for c in model_columns]
-            has_tabular_model = any(not enc_type.startswith("LANGUAGE_") for enc_type in enc_types)
-            has_language_model = any(enc_type.startswith("LANGUAGE_") for enc_type in enc_types)
+            has_tabular_model = any(not enc_type.startswith(ModelType.language) for enc_type in enc_types)
+            has_language_model = any(enc_type.startswith(ModelType.language) for enc_type in enc_types)
         else:
             has_tabular_model = True
             has_language_model = False
