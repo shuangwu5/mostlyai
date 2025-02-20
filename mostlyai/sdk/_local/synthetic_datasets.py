@@ -138,7 +138,7 @@ def create_synthetic_dataset(
     for step in FINALIZE_GENERATION_TASK_STEPS:
         progress_steps.append(
             ProgressStep(
-                task_type=TaskType.finalize_generation,
+                task_type=TaskType.generate,
                 model_label=None,
                 step_code=step,
                 progress=ProgressValue(value=0, max=1),

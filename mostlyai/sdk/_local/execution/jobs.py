@@ -298,9 +298,9 @@ class Execution:
             TaskType.train_language: self.execute_task_train,
             TaskType.finalize_training: self.execute_task_finalize_training,
             TaskType.generate: self.execute_task_generate,
-            TaskType.finalize_generation: self.execute_task_finalize_generation,
+            # TaskType.finalize_generation: self.execute_task_finalize_generation,
             TaskType.probe: self.execute_task_generate,
-            TaskType.finalize_probing: self.execute_task_finalize_probing,
+            # TaskType.finalize_probing: self.execute_task_finalize_probing,
         }
         for task in self._execution_plan.tasks:
             handler = task_handlers.get(task.type)
@@ -406,67 +406,76 @@ class Execution:
         # gather common step arguments
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
-        is_probe = task.type == TaskType.probe
-        model_type = ModelType.tabular if task.type == TaskType.probe else ModelType.language
-        model_label = f"{task.target_table_name}:{model_type.value.lower()}"
-        sd_table = next(t for t in synthetic_dataset.tables if t.name == task.target_table_name)
-        synthetic_dataset_dir = self._home_dir / "synthetic-datasets" / synthetic_dataset.id
-        generator_dir = self._home_dir / "generators" / generator.id
-        workspace_dir = self._job_workspace_dir / model_label
-        workspace_dir.mkdir()
-        update_progress_fn = partial(
-            LocalProgressCallback, resource_path=synthetic_dataset_dir, model_label=model_label
-        )
-
-        # copy AI model to workspace
-        _copy_model(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
-
-        # step: GENERATE_DATA
-        if sd_table.configuration.sample_seed_connector_id is not None:
-            sample_seed = _fetch_sample_seed(
-                home_dir=self._home_dir,
-                connector_id=sd_table.configuration.sample_seed_connector_id,
-            )
-        else:
-            sample_seed = None
-        schema = create_generation_schema(
-            generator=generator,
-            job_workspace_dir=self._job_workspace_dir,
-            step="pull_context_data",
-        )
-        execute_step_generate_data(
-            generator=generator,
-            synthetic_dataset=synthetic_dataset,
-            target_table_name=task.target_table_name,
-            model_type=model_type,
-            sample_seed=sample_seed,
-            schema=schema,
-            workspace_dir=workspace_dir,
-            update_progress=update_progress_fn(step_code=StepCode.generate_data),
-        )
-
-        if not is_probe:
-            # copy QA statistics to workspace
-            _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
-            # step: GENERATE_DATA_REPORT
-            execute_step_create_data_report(
-                generator=generator,
-                target_table_name=task.target_table_name,
-                model_type=model_type,
-                workspace_dir=workspace_dir,
-                update_progress=update_progress_fn(step_code=StepCode.create_data_report),
+        visited_tables = set()
+        for step in task.steps:
+            model_type = ModelType.tabular if step.step_code == StepCode.generate_data_tabular else ModelType.language
+            model_label = f"{step.target_table_name}:{model_type.value.lower()}"
+            sd_table = next(t for t in synthetic_dataset.tables if t.name == step.target_table_name)
+            synthetic_dataset_dir = self._home_dir / "synthetic-datasets" / synthetic_dataset.id
+            generator_dir = self._home_dir / "generators" / generator.id
+            workspace_dir = self._job_workspace_dir / model_label
+            workspace_dir.mkdir(exist_ok=True)
+            update_progress_fn = partial(
+                LocalProgressCallback, resource_path=synthetic_dataset_dir, model_label=model_label
             )
 
-        # as a last step of LANGUAGE model generation, merge context and generated data
-        if model_type == ModelType.language:
-            _merge_tabular_language_data(workspace_dir=workspace_dir)
-            # overwrite tabular SyntheticData with tabular+language SyntheticData
-            tabular_workspace_dir = self._job_workspace_dir / f"{task.target_table_name}:tabular"
-            tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
-            shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
-            shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
+            if step.target_table_name not in visited_tables:
+                # copy AI model to workspace
+                _copy_model(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
+            visited_tables.add(step.target_table_name)
 
-    def execute_task_finalize_generation(self, task: Task):
+            match step.step_code:
+                case StepCode.generate_data_tabular | StepCode.generate_data_language:
+                    # step: GENERATE_DATA
+                    if sd_table.configuration.sample_seed_connector_id is not None:
+                        sample_seed = _fetch_sample_seed(
+                            home_dir=self._home_dir,
+                            connector_id=sd_table.configuration.sample_seed_connector_id,
+                        )
+                    else:
+                        sample_seed = None
+                    schema = create_generation_schema(
+                        generator=generator,
+                        job_workspace_dir=self._job_workspace_dir,
+                        step="pull_context_data",
+                    )
+                    execute_step_generate_data(
+                        generator=generator,
+                        synthetic_dataset=synthetic_dataset,
+                        target_table_name=step.target_table_name,
+                        model_type=model_type,
+                        sample_seed=sample_seed,
+                        schema=schema,
+                        workspace_dir=workspace_dir,
+                        update_progress=update_progress_fn(step_code=StepCode.generate_data),
+                    )
+                    # as a last step of LANGUAGE model generation, merge context and generated data
+                    if model_type == ModelType.language:
+                        _merge_tabular_language_data(workspace_dir=workspace_dir)
+                        # overwrite tabular SyntheticData with tabular+language SyntheticData
+                        tabular_workspace_dir = self._job_workspace_dir / f"{task.target_table_name}:tabular"
+                        tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
+                        shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
+
+                case StepCode.create_data_report:
+                    # copy QA statistics to workspace
+                    _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
+                    # step: GENERATE_DATA_REPORT
+                    execute_step_create_data_report(
+                        generator=generator,
+                        target_table_name=step.target_table_name,
+                        model_type=model_type,
+                        workspace_dir=workspace_dir,
+                        update_progress=update_progress_fn(step_code=StepCode.create_data_report),
+                    )
+
+                case StepCode.finalize_generation:
+                    self.execute_task_finalize_generation()
+                case StepCode.finalize_probing:
+                    self.execute_task_finalize_probing()
+
+    def execute_task_finalize_generation(self):
         schema = create_generation_schema(
             generator=self._generator,
             job_workspace_dir=self._job_workspace_dir,
