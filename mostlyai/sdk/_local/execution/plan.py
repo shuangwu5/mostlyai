@@ -86,20 +86,12 @@ class ExecutionPlan(BaseModel):
     tasks: list[Task]
 
     def add_task(self, task_type: TaskType, parent: Task | None = None, target_table_name: str | None = None) -> Task:
-        def get_steps(task_type: TaskType) -> list[StepCode] | None:
+        def get_steps(task_type: TaskType) -> list[Step] | None:
             match task_type:
                 case TaskType.train_tabular | TaskType.train_language:
-                    return TRAINING_TASK_STEPS
+                    return [Step(step_code=code) for code in TRAINING_TASK_STEPS]
                 case TaskType.finalize_training:
-                    return FINALIZE_TRAINING_TASK_STEPS
-                # case TaskType.generate_tabular | TaskType.generate_language:
-                #     return GENERATION_TASK_STEPS
-                # case TaskType.finalize_generation:
-                #     return FINALIZE_GENERATION_TASK_STEPS
-                # case TaskType.probe:
-                #     return PROBING_TASK_STEPS
-                case TaskType.finalize_probing:
-                    return FINALIZE_PROBING_TASK_STEPS
+                    return [Step(step_code=code) for code in FINALIZE_TRAINING_TASK_STEPS]
                 case _:
                     return None
 
