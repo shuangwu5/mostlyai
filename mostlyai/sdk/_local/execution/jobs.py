@@ -407,11 +407,7 @@ class Execution:
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
         is_probe = task.type == TaskType.probe
-        model_type = (
-            ModelType.tabular
-            if task.type == TaskType.probe
-            else ModelType.language
-        )
+        model_type = ModelType.tabular if task.type == TaskType.probe else ModelType.language
         model_label = f"{task.target_table_name}:{model_type.value.lower()}"
         sd_table = next(t for t in synthetic_dataset.tables if t.name == task.target_table_name)
         synthetic_dataset_dir = self._home_dir / "synthetic-datasets" / synthetic_dataset.id

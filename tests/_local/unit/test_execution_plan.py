@@ -26,7 +26,8 @@ from mostlyai.sdk.domain import (
 from mostlyai.sdk._local.execution.plan import (
     ExecutionPlan,
     make_synthetic_dataset_execution_plan,
-    make_generator_execution_plan, Step,
+    make_generator_execution_plan,
+    Step,
 )
 from mostlyai.sdk.domain import (
     ModelConfiguration,
@@ -104,14 +105,13 @@ def test_make_synthetic_dataset_execution_plan():
             Step(step_code=StepCode.deliver_data, target_table_name="order_items"),
             Step(step_code=StepCode.finalize_generation, target_table_name="prices"),
             Step(step_code=StepCode.deliver_data, target_table_name="prices"),
-        ]
+        ],
     )
 
     assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)
     for actual, expected in zip(execution_plan.tasks, expected_execution_plan.tasks):
         assert actual.type == expected.type
         assert actual.steps == expected.steps
-
 
 
 def test_make_generator_execution_plan():
@@ -242,7 +242,7 @@ def test_make_synthetic_dataset_execution_plan_with_probe():
             Step(step_code=StepCode.deliver_data, target_table_name="users"),
             Step(step_code=StepCode.finalize_generation, target_table_name="posts"),
             Step(step_code=StepCode.deliver_data, target_table_name="posts"),
-        ]
+        ],
     )
 
     assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)

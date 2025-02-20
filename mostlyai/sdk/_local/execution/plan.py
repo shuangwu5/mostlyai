@@ -64,6 +64,7 @@ def has_tabular_model(table: SourceTable) -> bool:
 def has_language_model(table: SourceTable) -> bool:
     return table.language_model_configuration is not None
 
+
 class Step(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -168,8 +169,13 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
             current_table = queue.popleft()
 
             child_tables = sorted(
-                [table for table in generator.tables if any(
-                    fk.referenced_table == current_table.name and fk.is_context for fk in table.foreign_keys or [])],
+                [
+                    table
+                    for table in generator.tables
+                    if any(
+                        fk.referenced_table == current_table.name and fk.is_context for fk in table.foreign_keys or []
+                    )
+                ],
                 key=lambda t: t.name,
             )
 
@@ -178,9 +184,13 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
                 has_language = has_language_model(child_table)
 
                 if has_tabular:
-                    generate_steps.append(Step(step_code=StepCode.generate_data_tabular, target_table_name=child_table.name))
+                    generate_steps.append(
+                        Step(step_code=StepCode.generate_data_tabular, target_table_name=child_table.name)
+                    )
                 if has_language:
-                    generate_steps.append(Step(step_code=StepCode.generate_data_language, target_table_name=child_table.name))
+                    generate_steps.append(
+                        Step(step_code=StepCode.generate_data_language, target_table_name=child_table.name)
+                    )
                 generate_steps.append(Step(step_code=StepCode.create_data_report, target_table_name=child_table.name))
 
                 # Finalization steps will be executed later
