@@ -484,11 +484,9 @@ class TaskType(str, Enum):
     train_tabular = "TRAIN_TABULAR"
     train_language = "TRAIN_LANGUAGE"
     finalize_training = "FINALIZE_TRAINING"
-    generate_tabular = "GENERATE_TABULAR"
-    generate_language = "GENERATE_LANGUAGE"
+    generate = "GENERATE"
     finalize_generation = "FINALIZE_GENERATION"
-    probe_tabular = "PROBE_TABULAR"
-    probe_language = "PROBE_LANGUAGE"
+    probe = "PROBE"
     finalize_probing = "FINALIZE_PROBING"
 
 
@@ -505,6 +503,8 @@ class StepCode(str, Enum):
     create_model_report = "CREATE_MODEL_REPORT"
     finalize_training = "FINALIZE_TRAINING"
     generate_data = "GENERATE_DATA"
+    generate_data_tabular = "GENERATE_DATA_TABULAR"
+    generate_data_language = "GENERATE_DATA_LANGUAGE"
     create_data_report = "CREATE_DATA_REPORT"
     finalize_generation = "FINALIZE_GENERATION"
     deliver_data = "DELIVER_DATA"

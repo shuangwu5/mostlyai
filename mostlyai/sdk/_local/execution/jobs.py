@@ -297,11 +297,9 @@ class Execution:
             TaskType.train_tabular: self.execute_task_train,
             TaskType.train_language: self.execute_task_train,
             TaskType.finalize_training: self.execute_task_finalize_training,
-            TaskType.generate_tabular: self.execute_task_generate,
-            TaskType.generate_language: self.execute_task_generate,
+            TaskType.generate: self.execute_task_generate,
             TaskType.finalize_generation: self.execute_task_finalize_generation,
-            TaskType.probe_tabular: self.execute_task_generate,
-            TaskType.probe_language: self.execute_task_generate,
+            TaskType.probe: self.execute_task_generate,
             TaskType.finalize_probing: self.execute_task_finalize_probing,
         }
         for task in self._execution_plan.tasks:
@@ -408,10 +406,10 @@ class Execution:
         # gather common step arguments
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
-        is_probe = task.type in (TaskType.probe_tabular, TaskType.probe_language)
+        is_probe = task.type == TaskType.probe
         model_type = (
             ModelType.tabular
-            if task.type in (TaskType.generate_tabular, TaskType.probe_tabular)
+            if task.type == TaskType.probe
             else ModelType.language
         )
         model_label = f"{task.target_table_name}:{model_type.value.lower()}"
