@@ -447,7 +447,11 @@ class Execution:
                         sample_seed=sample_seed,
                         schema=schema,
                         workspace_dir=workspace_dir,
-                        update_progress=update_progress_fn(step_code=StepCode.generate_data),
+                        update_progress=update_progress_fn(
+                            step_code=StepCode.generate_data_tabular
+                            if model_type == ModelType.tabular
+                            else StepCode.generate_data_language
+                        ),
                     )
                     # as a last step of LANGUAGE model generation, merge context and generated data
                     if model_type == ModelType.language:
