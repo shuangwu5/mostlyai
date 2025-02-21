@@ -407,8 +407,17 @@ class Execution:
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
         visited_tables = set()
-        for step in task.steps:
-            is_tabular = step.step_code == StepCode.generate_data_tabular or task.type == TaskType.train_tabular
+        for step_i, step in enumerate(task.steps):
+            if step.step_code == StepCode.create_data_report:
+                generate_steps = [
+                    s
+                    for s in task.steps[:step_i]
+                    if s.target_table_name == step.target_table_name
+                    and s.step_code in {StepCode.generate_data_tabular, StepCode.generate_data_language}
+                ]
+                is_tabular = not generate_steps or generate_steps[-1].step_code == StepCode.generate_data_tabular
+            else:
+                is_tabular = step.step_code == StepCode.generate_data_tabular or task.type == TaskType.train_tabular
             model_type = ModelType.tabular if is_tabular else ModelType.language
             model_label = f"{step.target_table_name}:{model_type.value.lower()}"
             sd_table = next(t for t in synthetic_dataset.tables if t.name == step.target_table_name)
