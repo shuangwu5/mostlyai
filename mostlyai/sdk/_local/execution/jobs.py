@@ -487,7 +487,7 @@ class Execution:
                 case StepCode.finalize_generation:
                     self.execute_task_finalize_generation()
                 case StepCode.finalize_probing:
-                    self.execute_task_finalize_probing()
+                    self.execute_task_finalize_probing(task)
 
     def execute_task_finalize_generation(self):
         schema = create_generation_schema(
