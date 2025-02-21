@@ -19,6 +19,9 @@ from collections.abc import Callable
 
 import pandas as pd
 import rich
+from rich import box
+from rich.console import RenderableType
+from rich.live import Live
 from rich.progress import (
     Progress,
     TextColumn,
@@ -27,6 +30,8 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.style import Style
+from rich.table import Table
+from rich.text import Text
 
 from mostlyai.sdk.domain import (
     StepCode,
@@ -41,6 +46,24 @@ from mostlyai.sdk.domain import (
     GeneratorListItem,
 )
 from mostlyai.sdk.client._naming_conventions import map_camel_to_snake_case
+
+
+## utils for manipulating rich's Table object
+def _delete_row(table: Table, idx: int = -1) -> Table:
+    for column in table.columns:
+        column._cells = column._cells[:idx] + column._cells[idx + 1 :]
+    table.rows = table.rows[:idx] + table.rows[idx + 1 :]
+    return table
+
+
+def _insert_row(*renderables: RenderableType | None, table: Table, idx: int = -1) -> Table:
+    table.add_row(*renderables)
+    for column in table.columns:
+        column._cells.insert(idx, column._cells[-1])
+        column._cells.pop()
+    table.rows.insert(idx, table.rows[-1])
+    table.rows.pop()
+    return table
 
 
 def job_wait(
@@ -64,7 +87,8 @@ def job_wait(
             ),
             TaskProgressColumn(),
             TimeElapsedColumn(),
-            refresh_per_second=1 / interval,
+            auto_refresh=False,  # auto refresh will be handled by Live object
+            expand=True,
         )
         progress_bars = {
             "overall": progress.add_task(
@@ -86,10 +110,14 @@ def job_wait(
                     total=step.progress.max,
                 )
             }
+        layout = Table.grid(expand=True)
+        layout.add_row(progress)
+        live = Live(layout, refresh_per_second=1 / interval)
+        step_id_to_layout_idx = {}
     try:
         if progress_bar:
             # loop until job has completed
-            progress.start()
+            live.start()
         while True:
             # sleep for interval seconds
             time.sleep(interval)
@@ -108,26 +136,63 @@ def job_wait(
                 )
                 if current_task.started and job.end_date is not None:
                     progress.stop_task(current_task_id)
+
                 for i, step in enumerate(job.steps):
+                    # create the latest training log table
+                    if step.step_code == StepCode.train_model:
+                        messages = step.messages or []
+                        messages = messages[-6:]
+                        last_checkpoint_idx = next(
+                            (len(messages) - 1 - j for j, msg in enumerate(reversed(messages)) if msg["is_checkpoint"]),
+                            -1,
+                        )
+                        training_log = Table(
+                            title=f"Latest training log for `{step.model_label}`",
+                            box=box.SIMPLE_HEAD,
+                            expand=True,
+                            header_style="none",
+                        )
+                        columns = ["Epochs", "Samples", "Elapsed time", "Val loss"]
+                        if messages and messages[0].get("dp_eps"):
+                            columns.append("Diff Privacy (ε/δ)")
+                        for col in columns:
+                            training_log.add_column(col, justify="right")
+                        for j, message in enumerate(messages):
+                            formatted_message = [
+                                str(message[k]) for k in ["epoch", "samples", "total_time", "val_loss"]
+                            ]
+                            if message.get("dp_eps"):
+                                formatted_message.append(f"{message['dp_eps']:.2f} / {message['dp_delta']:.1e}")
+                            style = "#14b57d on #f0fff7" if j == last_checkpoint_idx else "bright_black"
+                            training_log.add_row(*formatted_message, style=style)
                     current_task_id = progress_bars[step.id]
                     current_task = progress.tasks[current_task_id]
                     if not current_task.started and step.start_date is not None:
                         progress.start_task(current_task_id)
+                        if step.step_code == StepCode.train_model:
+                            layout.add_row(Text("\n\n"))
+                            layout.add_row(training_log)
+                            step_id_to_layout_idx[step.id] = len(layout.rows) - 1
                     if step.progress.max > 0:
                         progress.update(
                             current_task_id,
                             total=step.progress.max,
                             completed=step.progress.value,
                         )
-                    if current_task.started and step.end_date is not None:
-                        progress.stop_task(current_task_id)
+                    if current_task.started:
+                        if step.step_code == StepCode.train_model:
+                            _delete_row(layout, step_id_to_layout_idx[step.id])
+                            _insert_row(training_log, table=layout, idx=step_id_to_layout_idx[step.id])
+                        if step.end_date is not None:
+                            progress.stop_task(current_task_id)
+                    live.update(layout)
                     # break if step has failed or been canceled
                     if step.status in (ProgressStatus.failed, ProgressStatus.canceled):
                         rich.print(f"[red]Step {step.model_label} {step.step_code.value} {step.status.lower()}")
                         return
                 # check whether we are done
                 if job.progress.value >= job.progress.max:
-                    progress.refresh()
+                    live.refresh()
                     time.sleep(1)  # give the system a moment to update the status
                     return
             else:
@@ -142,7 +207,7 @@ def job_wait(
         return
     finally:
         if progress_bar:
-            progress.stop()
+            live.stop()
 
 
 def _get_subject_table_names(generator: Generator) -> list[str]:
