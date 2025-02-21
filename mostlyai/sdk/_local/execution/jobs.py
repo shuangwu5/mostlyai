@@ -408,7 +408,8 @@ class Execution:
         synthetic_dataset = self._synthetic_dataset
         visited_tables = set()
         for step in task.steps:
-            model_type = ModelType.tabular if step.step_code == StepCode.generate_data_tabular else ModelType.language
+            is_tabular = step.step_code == StepCode.generate_data_tabular or task.type == TaskType.train_tabular
+            model_type = ModelType.tabular if is_tabular else ModelType.language
             model_label = f"{step.target_table_name}:{model_type.value.lower()}"
             sd_table = next(t for t in synthetic_dataset.tables if t.name == step.target_table_name)
             synthetic_dataset_dir = self._home_dir / "synthetic-datasets" / synthetic_dataset.id
