@@ -177,18 +177,24 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
                 has_language = has_language_model(child_table)
 
                 if has_tabular:
-                    generate_steps.append(Step(
-                        step_code=StepCode.probe_tabular if is_probe else StepCode.generate_data_tabular,
-                        target_table_name=child_table.name
-                    ))
+                    generate_steps.append(
+                        Step(
+                            step_code=StepCode.probe_tabular if is_probe else StepCode.generate_data_tabular,
+                            target_table_name=child_table.name,
+                        )
+                    )
                 if has_language:
-                    generate_steps.append(Step(
-                        step_code=StepCode.probe_language if is_probe else StepCode.generate_data_language,
-                        target_table_name=child_table.name
-                    ))
+                    generate_steps.append(
+                        Step(
+                            step_code=StepCode.probe_language if is_probe else StepCode.generate_data_language,
+                            target_table_name=child_table.name,
+                        )
+                    )
 
                 if not is_probe:
-                    generate_steps.append(Step(step_code=StepCode.create_data_report, target_table_name=child_table.name))
+                    generate_steps.append(
+                        Step(step_code=StepCode.create_data_report, target_table_name=child_table.name)
+                    )
 
                 finalize_steps.append(Step(step_code=finalize_task_type, target_table_name=child_table.name))
 
