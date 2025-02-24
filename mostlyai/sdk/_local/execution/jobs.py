@@ -403,9 +403,11 @@ class Execution:
         pass
 
     def execute_task_generate(self, task: Task):
+        print(f"{task=}")
         # gather common step arguments
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
+        visited_tables = set()
         visited_models = set()
         for step_i, step in enumerate(task.steps):
             if step.step_code in (StepCode.create_data_report, StepCode.finalize_generation, StepCode.finalize_probing):
@@ -420,7 +422,6 @@ class Execution:
                 is_tabular = step.step_code == StepCode.generate_data_tabular or task.type == TaskType.train_tabular
             model_type = ModelType.tabular if is_tabular else ModelType.language
             model_label = f"{step.target_table_name}:{model_type.value.lower()}"
-            sd_table = next(t for t in synthetic_dataset.tables if t.name == step.target_table_name)
             synthetic_dataset_dir = self._home_dir / "synthetic-datasets" / synthetic_dataset.id
             generator_dir = self._home_dir / "generators" / generator.id
             workspace_dir = self._job_workspace_dir / model_label
@@ -440,6 +441,8 @@ class Execution:
             match step.step_code:
                 case StepCode.generate_data_tabular | StepCode.generate_data_language:
                     # step: GENERATE_DATA
+                    visited_tables.add(step.target_table_name)
+                    sd_table = next(t for t in synthetic_dataset.tables if t.name == step.target_table_name)
                     if sd_table.configuration.sample_seed_connector_id is not None:
                         sample_seed = _fetch_sample_seed(
                             home_dir=self._home_dir,
@@ -481,13 +484,16 @@ class Execution:
 
                 case StepCode.finalize_generation | StepCode.finalize_probing:
                     # as a last step of LANGUAGE model generation, merge context and generated data
-                    if model_type == ModelType.language:
-                        _merge_tabular_language_data(workspace_dir=workspace_dir)
-                        # overwrite tabular SyntheticData with tabular+language SyntheticData
-                        tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
-                        tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
-                        shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
-                        shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
+                    for table in visited_tables:
+                        if Path(self._job_workspace_dir / f"{table}:language").exists():
+                            model_label = f"{table}:language"
+                            workspace_dir = self._job_workspace_dir / model_label
+                            _merge_tabular_language_data(workspace_dir=workspace_dir)
+                            # overwrite tabular SyntheticData with tabular+language SyntheticData
+                            tabular_workspace_dir = self._job_workspace_dir / f"{table}:tabular"
+                            tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
+                            shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
+                            shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
 
                     finalize_method = (
                         self.execute_task_finalize_generation
