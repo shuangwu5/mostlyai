@@ -128,7 +128,6 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
 def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool = False) -> ExecutionPlan:
     execution_plan = ExecutionPlan(tasks=[])
     generate_task_type = TaskType.probe if is_probe else TaskType.generate
-    finalize_task_type = TaskType.finalize_probing if is_probe else TaskType.finalize_generation
     finalize_step_code = StepCode.finalize_probing if is_probe else StepCode.finalize_generation
 
     generate_steps = []
