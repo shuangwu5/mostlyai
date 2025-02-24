@@ -179,14 +179,14 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
                 if has_tabular:
                     generate_steps.append(
                         Step(
-                            step_code=StepCode.probe_tabular if is_probe else StepCode.generate_data_tabular,
+                            step_code=StepCode.generate_data_tabular if is_probe else StepCode.generate_data_tabular,
                             target_table_name=child_table.name,
                         )
                     )
                 if has_language:
                     generate_steps.append(
                         Step(
-                            step_code=StepCode.probe_language if is_probe else StepCode.generate_data_language,
+                            step_code=StepCode.generate_data_language if is_probe else StepCode.generate_data_language,
                             target_table_name=child_table.name,
                         )
                     )

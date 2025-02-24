@@ -406,7 +406,7 @@ class Execution:
         # gather common step arguments
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
-        visited_tables = set()
+        visited_models = set()
         for step_i, step in enumerate(task.steps):
             if step.step_code == StepCode.create_data_report:
                 generate_steps = [
@@ -429,10 +429,13 @@ class Execution:
                 LocalProgressCallback, resource_path=synthetic_dataset_dir, model_label=model_label
             )
 
-            if step.target_table_name not in visited_tables:
+            if (
+                step.step_code in (StepCode.generate_data_tabular, StepCode.generate_data_language)
+                and model_label not in visited_models
+            ):
                 # copy AI model to workspace
                 _copy_model(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
-            visited_tables.add(step.target_table_name)
+            visited_models.add(model_label)
 
             match step.step_code:
                 case StepCode.generate_data_tabular | StepCode.generate_data_language:
@@ -473,6 +476,8 @@ class Execution:
                         shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
 
                 case StepCode.create_data_report:
+                    # FIXME is it neede?
+                    # tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
                     # copy QA statistics to workspace
                     _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
                     # step: GENERATE_DATA_REPORT
