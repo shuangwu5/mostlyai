@@ -476,20 +476,21 @@ class Execution:
                         shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
 
                 case StepCode.create_data_report:
-                    # data report to be created always from tabular workspace
-                    model_type = ModelType.tabular
-                    model_label = f"{step.target_table_name}:tabular"
-                    tabular_workspace_dir = self._job_workspace_dir / model_label
+                    # data report to be created from tabular workspace (if exists), otherwise from language workspace
+                    tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
+                    model_type = ModelType.tabular if tabular_workspace_dir.exists() else ModelType.language
+                    model_label = f"{step.target_table_name}:{model_type.value.lower()}"
+                    workspace_dir = self._job_workspace_dir / model_label
                     # copy QA statistics to workspace
                     _copy_statistics(
-                        generator_dir=generator_dir, model_label=model_label, workspace_dir=tabular_workspace_dir
+                        generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir
                     )
                     # step: GENERATE_DATA_REPORT
                     execute_step_create_data_report(
                         generator=generator,
                         target_table_name=step.target_table_name,
                         model_type=model_type,
-                        workspace_dir=tabular_workspace_dir,
+                        workspace_dir=workspace_dir,
                         update_progress=update_progress_fn(step_code=StepCode.create_data_report),
                     )
 
