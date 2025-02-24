@@ -408,7 +408,7 @@ class Execution:
         synthetic_dataset = self._synthetic_dataset
         visited_models = set()
         for step_i, step in enumerate(task.steps):
-            if step.step_code == StepCode.create_data_report:
+            if step.step_code in (StepCode.create_data_report, StepCode.finalize_generation, StepCode.finalize_probing):
                 generate_steps = [
                     s
                     for s in task.steps[:step_i]
@@ -435,7 +435,7 @@ class Execution:
             ):
                 # copy AI model to workspace
                 _copy_model(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
-            visited_models.add(model_label)
+                visited_models.add(model_label)
 
             match step.step_code:
                 case StepCode.generate_data_tabular | StepCode.generate_data_language:
