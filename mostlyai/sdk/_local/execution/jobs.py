@@ -466,25 +466,10 @@ class Execution:
                             else StepCode.generate_data_language
                         ),
                     )
-                    # as a last step of LANGUAGE model generation, merge context and generated data
-                    if model_type == ModelType.language:
-                        _merge_tabular_language_data(workspace_dir=workspace_dir)
-                        # overwrite tabular SyntheticData with tabular+language SyntheticData
-                        tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
-                        tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
-                        shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
-                        shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
 
                 case StepCode.create_data_report:
-                    # data report to be created from tabular workspace (if exists), otherwise from language workspace
-                    tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
-                    model_type = ModelType.tabular if tabular_workspace_dir.exists() else ModelType.language
-                    model_label = f"{step.target_table_name}:{model_type.value.lower()}"
-                    workspace_dir = self._job_workspace_dir / model_label
                     # copy QA statistics to workspace
-                    _copy_statistics(
-                        generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir
-                    )
+                    _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
                     # step: GENERATE_DATA_REPORT
                     execute_step_create_data_report(
                         generator=generator,
@@ -494,10 +479,22 @@ class Execution:
                         update_progress=update_progress_fn(step_code=StepCode.create_data_report),
                     )
 
-                case StepCode.finalize_generation:
-                    self.execute_task_finalize_generation()
-                case StepCode.finalize_probing:
-                    self.execute_task_finalize_probing(task)
+                case StepCode.finalize_generation | StepCode.finalize_probing:
+                    # as a last step of LANGUAGE model generation, merge context and generated data
+                    if model_type == ModelType.language:
+                        _merge_tabular_language_data(workspace_dir=workspace_dir)
+                        # overwrite tabular SyntheticData with tabular+language SyntheticData
+                        tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
+                        tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
+                        shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
+
+                    finalize_method = (
+                        self.execute_task_finalize_generation
+                        if step.step_code == StepCode.finalize_generation
+                        else self.execute_task_finalize_probing
+                    )
+                    finalize_method()
 
     def execute_task_finalize_generation(self):
         schema = create_generation_schema(
@@ -538,7 +535,7 @@ class Execution:
             job_workspace_dir=self._job_workspace_dir,
         )
 
-    def execute_task_finalize_probing(self, task: Task):
+    def execute_task_finalize_probing(self):
         schema = create_generation_schema(
             generator=self._generator,
             job_workspace_dir=self._job_workspace_dir,
