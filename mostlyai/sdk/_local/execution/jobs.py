@@ -467,7 +467,7 @@ class Execution:
                     if model_type == ModelType.language:
                         _merge_tabular_language_data(workspace_dir=workspace_dir)
                         # overwrite tabular SyntheticData with tabular+language SyntheticData
-                        tabular_workspace_dir = self._job_workspace_dir / f"{task.target_table_name}:tabular"
+                        tabular_workspace_dir = self._job_workspace_dir / f"{step.target_table_name}:tabular"
                         tabular_workspace_dir.mkdir(parents=True, exist_ok=True)
                         shutil.rmtree(tabular_workspace_dir / "SyntheticData", ignore_errors=True)
                         shutil.move(workspace_dir / "SyntheticData", tabular_workspace_dir / "SyntheticData")
