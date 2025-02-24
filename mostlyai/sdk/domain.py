@@ -502,7 +502,6 @@ class StepCode(str, Enum):
     generate_model_report_data = "GENERATE_MODEL_REPORT_DATA"
     create_model_report = "CREATE_MODEL_REPORT"
     finalize_training = "FINALIZE_TRAINING"
-    generate_data = "GENERATE_DATA"
     generate_data_tabular = "GENERATE_DATA_TABULAR"
     generate_data_language = "GENERATE_DATA_LANGUAGE"
     create_data_report = "CREATE_DATA_REPORT"
