@@ -32,12 +32,18 @@ TRAINING_TASK_STEPS: list[StepCode] = [
 FINALIZE_TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_training,
 ]
-GENERATION_TASK_STEPS: list[StepCode] = [
+GENERATION_TASK_TABULAR_STEPS: list[StepCode] = [
     StepCode.generate_data_tabular,
-    StepCode.generate_data_language,
     StepCode.create_data_report_tabular,
+]
+GENERATION_TASK_LANGUAGE_STEPS: list[StepCode] = [
+    StepCode.generate_data_language,
     StepCode.create_data_report_language,
 ]
+MODEL_TYPE_STEPS_MAP = {
+    ModelType.tabular: GENERATION_TASK_TABULAR_STEPS,
+    ModelType.language: GENERATION_TASK_LANGUAGE_STEPS,
+}
 FINALIZE_GENERATION_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_generation,
     StepCode.deliver_data,
