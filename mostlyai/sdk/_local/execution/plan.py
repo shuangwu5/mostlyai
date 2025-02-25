@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from pydantic import BaseModel, Field, ConfigDict
 from collections import deque
 from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType, ModelType
@@ -129,72 +128,49 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
     execution_plan = ExecutionPlan(tasks=[])
     generate_task_type = TaskType.probe if is_probe else TaskType.generate
     finalize_step_code = StepCode.finalize_probing if is_probe else StepCode.finalize_generation
-
     generate_steps = []
 
-    root_tables = [table for table in generator.tables if not any(fk.is_context for fk in table.foreign_keys or [])]
+    def add_generation_steps(table: SourceTable):
+        if has_tabular_model(table):
+            generate_steps.append(Step(step_code=StepCode.generate_data_tabular, target_table_name=table.name))
+        if has_language_model(table):
+            generate_steps.append(Step(step_code=StepCode.generate_data_language, target_table_name=table.name))
+        if not is_probe:
+            generate_steps.append(Step(step_code=StepCode.create_data_report, target_table_name=table.name))
+
+    # Identify root tables (tables without a foreign key referencing them)
+    root_tables = sorted(
+        (table for table in generator.tables if not any(fk.is_context for fk in table.foreign_keys or [])),
+        key=lambda t: t.name,
+    )
 
     # Process each root table and its subtree
-    for root_table in sorted(root_tables, key=lambda t: t.name):
-        has_tabular = has_tabular_model(root_table)
-        has_language = has_language_model(root_table)
+    for root_table in root_tables:
+        add_generation_steps(root_table)
 
-        if has_tabular:
-            generate_steps.append(Step(step_code=StepCode.generate_data_tabular, target_table_name=root_table.name))
-        if has_language:
-            generate_steps.append(Step(step_code=StepCode.generate_data_language, target_table_name=root_table.name))
-
-        if not is_probe:
-            generate_steps.append(Step(step_code=StepCode.create_data_report, target_table_name=root_table.name))
-
-        # Traverse child tables
+        # Traverse child tables using BFS
         queue = deque([root_table])
         while queue:
             current_table = queue.popleft()
 
             child_tables = sorted(
-                [
+                (
                     table
                     for table in generator.tables
                     if any(
                         fk.referenced_table == current_table.name and fk.is_context for fk in table.foreign_keys or []
                     )
-                ],
+                ),
                 key=lambda t: t.name,
             )
 
             for child_table in child_tables:
-                has_tabular = has_tabular_model(child_table)
-                has_language = has_language_model(child_table)
-
-                if has_tabular:
-                    generate_steps.append(
-                        Step(
-                            step_code=StepCode.generate_data_tabular if is_probe else StepCode.generate_data_tabular,
-                            target_table_name=child_table.name,
-                        )
-                    )
-                if has_language:
-                    generate_steps.append(
-                        Step(
-                            step_code=StepCode.generate_data_language if is_probe else StepCode.generate_data_language,
-                            target_table_name=child_table.name,
-                        )
-                    )
-
-                if not is_probe:
-                    generate_steps.append(
-                        Step(step_code=StepCode.create_data_report, target_table_name=child_table.name)
-                    )
-
+                add_generation_steps(child_table)
                 queue.append(child_table)
 
-    finalize_step = Step(step_code=finalize_step_code)
-    # Merge generation and finalization steps
-    all_steps = generate_steps + [finalize_step]
-
-    # Create a single GENERATE or PROBE task with all steps
-    if all_steps:
-        execution_plan.add_task_with_steps(generate_task_type, steps=all_steps)
+    # Add finalization step
+    if generate_steps:
+        generate_steps.append(Step(step_code=finalize_step_code))
+        execution_plan.add_task_with_steps(generate_task_type, steps=generate_steps)
 
     return execution_plan
