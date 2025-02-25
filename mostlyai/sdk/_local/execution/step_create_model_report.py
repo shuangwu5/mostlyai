@@ -155,7 +155,7 @@ def create_report(
             ctx_data=sorted(report_ctx_input_path.glob("part.*-val.parquet")) if has_context else None,
             **pull_kwargs,
         )
-    else:  # step_code == StepCode.create_data_report:
+    else:  # step_code == StepCode.create_data_report_*:
         syn_tgt_data, syn_ctx_data = pull_data_for_report(
             tgt_data=workspace.generated_data.fetch_all(),
             ctx_data=workspace.ctx_data.fetch_all() if has_context else None,

@@ -463,7 +463,6 @@ class Execution:
                 )
 
             elif step.step_code in {StepCode.create_data_report_tabular, StepCode.create_data_report_language}:
-                print(f"report_step: {step=}")
                 _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
                 # step: GENERATE_DATA_REPORT
                 execute_step_create_data_report(
