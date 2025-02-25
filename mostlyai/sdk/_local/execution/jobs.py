@@ -490,19 +490,22 @@ class Execution:
                         shutil.move(language_path / "SyntheticData", tabular_workspace / "SyntheticData")
 
                 finalize_method = (
-                    self.execute_task_finalize_generation
+                    self.execute_finalize_generation
                     if step.step_code == StepCode.finalize_generation
-                    else self.execute_task_finalize_probing
+                    else self.execute_finalize_probing
                 )
                 finalize_method()
 
-    def execute_task_finalize_generation(self):
+            elif step.step_code == StepCode.deliver_data:
+                self.execute_deliver_data()
+
+    def execute_finalize_generation(self):
         schema = create_generation_schema(
             generator=self._generator,
             job_workspace_dir=self._job_workspace_dir,
             step="finalize_generation",
         )
-        # step: FINALIZE_GENERATION
+
         usage = execute_step_finalize_generation(
             schema=schema,
             is_probe=False,
@@ -513,20 +516,23 @@ class Execution:
                 step_code=StepCode.finalize_generation,
             ),
         )
-        # update total rows and datapoints
+
         update_total_rows_and_datapoints(self._synthetic_dataset, usage)
 
-        # step: DELIVER_DATA
+    def execute_deliver_data(self):
         schema = create_generation_schema(
             generator=self._generator,
             job_workspace_dir=self._job_workspace_dir,
             step="deliver_data",
         )
+
         delivery = self._synthetic_dataset.delivery
-        if delivery is not None and delivery.destination_connector_id is not None:
-            connector = read_connector_from_json(self._home_dir / "connectors" / delivery.destination_connector_id)
-        else:
-            connector = None
+        connector = (
+            read_connector_from_json(self._home_dir / "connectors" / delivery.destination_connector_id)
+            if delivery and delivery.destination_connector_id
+            else None
+        )
+
         execute_step_deliver_data(
             generator=self._generator,
             delivery=delivery,
@@ -535,7 +541,7 @@ class Execution:
             job_workspace_dir=self._job_workspace_dir,
         )
 
-    def execute_task_finalize_probing(self):
+    def execute_finalize_probing(self):
         schema = create_generation_schema(
             generator=self._generator,
             job_workspace_dir=self._job_workspace_dir,

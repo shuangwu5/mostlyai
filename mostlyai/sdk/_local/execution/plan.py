@@ -168,9 +168,11 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
                 add_generation_steps(child_table)
                 queue.append(child_table)
 
-    # Add finalization step
+    # Add last common step(s)
     if generate_steps:
         generate_steps.append(Step(step_code=finalize_step_code))
+        if not is_probe:
+            generate_steps.append(Step(step_code=StepCode.deliver_data))
         execution_plan.add_task_with_steps(generate_task_type, steps=generate_steps)
 
     return execution_plan
