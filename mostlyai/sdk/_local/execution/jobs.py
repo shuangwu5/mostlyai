@@ -298,9 +298,7 @@ class Execution:
             TaskType.train_language: self.execute_task_train,
             TaskType.finalize_training: self.execute_task_finalize_training,
             TaskType.generate: self.execute_task_generate,
-            # TaskType.finalize_generation: self.execute_task_finalize_generation,
             TaskType.probe: self.execute_task_generate,
-            # TaskType.finalize_probing: self.execute_task_finalize_probing,
         }
         for task in self._execution_plan.tasks:
             handler = task_handlers.get(task.type)
@@ -403,7 +401,6 @@ class Execution:
         pass
 
     def execute_task_generate(self, task: Task):
-        print(f"{task=}")
         # gather common step arguments
         generator = self._generator
         synthetic_dataset = self._synthetic_dataset
