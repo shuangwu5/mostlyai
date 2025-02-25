@@ -190,7 +190,7 @@ def create_report(
         )
         # convert metrics from QA domain to SDK domain (if applicable)
         metrics = ModelMetrics(**metrics.model_dump()) if metrics else None
-    else:  # if step_code == StepCode.create_data_report:
+    else:  # if step_code == StepCode.create_data_report_*:
         # generate Data QA report
         (workspace_dir / "DataQAReports").mkdir(exist_ok=True, parents=True)
         _ = qa.report_from_statistics(

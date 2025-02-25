@@ -414,11 +414,7 @@ class Execution:
         for step in task.steps:
             model_type = (
                 ModelType.tabular
-                if step.step_code == StepCode.generate_data_tabular
-                or (
-                    step.step_code == StepCode.create_data_report
-                    and last_generated_step.get(step.target_table_name) == StepCode.generate_data_tabular
-                )
+                if step.step_code in {StepCode.generate_data_tabular, StepCode.create_data_report_tabular}
                 else ModelType.language
             )
 
@@ -466,7 +462,8 @@ class Execution:
                     update_progress=update_progress(step_code=step.step_code),
                 )
 
-            elif step.step_code == StepCode.create_data_report:
+            elif step.step_code in {StepCode.create_data_report_tabular, StepCode.create_data_report_language}:
+                print(f"report_step: {step=}")
                 _copy_statistics(generator_dir=generator_dir, model_label=model_label, workspace_dir=workspace_dir)
                 # step: GENERATE_DATA_REPORT
                 execute_step_create_data_report(
@@ -474,7 +471,7 @@ class Execution:
                     target_table_name=step.target_table_name,
                     model_type=model_type,
                     workspace_dir=workspace_dir,
-                    update_progress=update_progress(step_code=StepCode.create_data_report),
+                    update_progress=update_progress(step_code=step.step_code),
                 )
 
             elif step.step_code in {StepCode.finalize_generation, StepCode.finalize_probing}:

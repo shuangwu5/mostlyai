@@ -35,7 +35,8 @@ FINALIZE_TRAINING_TASK_STEPS: list[StepCode] = [
 GENERATION_TASK_STEPS: list[StepCode] = [
     StepCode.generate_data_tabular,
     StepCode.generate_data_language,
-    StepCode.create_data_report,
+    StepCode.create_data_report_tabular,
+    StepCode.create_data_report_language,
 ]
 FINALIZE_GENERATION_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_generation,
@@ -132,11 +133,16 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
 
     def add_generation_steps(table: SourceTable):
         if has_tabular_model(table):
-            generate_steps.append(Step(step_code=StepCode.generate_data_tabular, target_table_name=table.name))
+            steps = [Step(step_code=StepCode.generate_data_tabular, target_table_name=table.name)]
+            if not is_probe:
+                steps.append(Step(step_code=StepCode.create_data_report_tabular, target_table_name=table.name))
+            generate_steps.extend(steps)
+
         if has_language_model(table):
-            generate_steps.append(Step(step_code=StepCode.generate_data_language, target_table_name=table.name))
-        if not is_probe:
-            generate_steps.append(Step(step_code=StepCode.create_data_report, target_table_name=table.name))
+            steps = [Step(step_code=StepCode.generate_data_language, target_table_name=table.name)]
+            if not is_probe:
+                steps.append(Step(step_code=StepCode.create_data_report_language, target_table_name=table.name))
+            generate_steps.extend(steps)
 
     # Identify root tables (tables without a foreign key referencing them)
     root_tables = sorted(
