@@ -504,7 +504,9 @@ class StepCode(str, Enum):
     finalize_training = "FINALIZE_TRAINING"
     generate_data_tabular = "GENERATE_DATA_TABULAR"
     generate_data_language = "GENERATE_DATA_LANGUAGE"
-    create_data_report = "CREATE_DATA_REPORT"
+    create_data_report = "CREATE_DATA_REPORT"  # TODO remove
+    create_data_report_tabular = "CREATE_DATA_REPORT_TABULAR"
+    create_data_report_language = "CREATE_DATA_REPORT_LANGUAGE"
     finalize_generation = "FINALIZE_GENERATION"
     deliver_data = "DELIVER_DATA"
     finalize_probing = "FINALIZE_PROBING"
