@@ -73,11 +73,6 @@ class _MostlyBaseClient:
         self.transport = httpx.HTTPTransport(uds=uds) if uds else None
         self.timeout = timeout
         self.ssl_verify = ssl_verify
-        if not self.api_key:
-            raise APIError(
-                "The API key must be either set by passing api_key to the client or by specifying a "
-                "MOSTLY_API_KEY environment variable"
-            )
 
     def headers(self):
         return {
@@ -263,15 +258,15 @@ class CustomBaseModel(BaseModel):
             rich.print(self.model_dump())
         return capture.get()
 
-    def open(self) -> str:
+    def open(self) -> None:
         """
         Opens the instance in a web browser.
         """
         if self.client is None or not self.OPEN_URL_PARTS or not hasattr(self, "id"):
             raise APIError("Cannot open the instance")
         url = "/".join([self.client.base_url, *self.OPEN_URL_PARTS, str(self.id)])
+        rich.print(f"Go to [link={url}]{url}[/]")
         webbrowser.open_new(url)
-        return url
 
     def reload(self):
         """
