@@ -470,11 +470,11 @@ class Execution:
             elif step.step_code in {StepCode.finalize_generation, StepCode.finalize_probing}:
                 # for every LANGUAGE model generation, merge context and generated data
                 for table in visited_tables:
-                    language_path = self._job_workspace_dir / ModelType.language.value.lower()
+                    language_path = self._job_workspace_dir / f"{table}:{ModelType.language.value.lower()}"
                     if language_path.exists():
                         _merge_tabular_language_data(workspace_dir=language_path)
 
-                        tabular_workspace = self._job_workspace_dir / ModelType.tabular.value.lower()
+                        tabular_workspace = self._job_workspace_dir / f"{table}:{ModelType.tabular.value.lower()}"
                         tabular_workspace.mkdir(parents=True, exist_ok=True)
                         shutil.rmtree(tabular_workspace / "SyntheticData", ignore_errors=True)
                         shutil.move(language_path / "SyntheticData", tabular_workspace / "SyntheticData")
