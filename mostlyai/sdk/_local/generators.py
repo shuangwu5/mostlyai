@@ -96,8 +96,14 @@ def create_generator(home_dir: Path, config: GeneratorConfig) -> Generator:
             if check
         ]
         for model_type in model_types:
-            # TODO create_model_report step is now optional
             for step in TRAINING_TASK_STEPS:
+                model_configuration = (
+                    table.tabular_model_configuration
+                    if model_type == ModelType.tabular
+                    else table.language_model_configuration
+                )
+                if not model_configuration.enable_model_report:
+                    continue
                 progress_steps.append(
                     ProgressStep(
                         task_type=TaskType.train_tabular
