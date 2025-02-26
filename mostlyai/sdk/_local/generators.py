@@ -96,6 +96,7 @@ def create_generator(home_dir: Path, config: GeneratorConfig) -> Generator:
             if check
         ]
         for model_type in model_types:
+            # TODO create_model_report step is now optional
             for step in TRAINING_TASK_STEPS:
                 progress_steps.append(
                     ProgressStep(
