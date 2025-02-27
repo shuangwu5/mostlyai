@@ -162,16 +162,16 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
         add_generation_steps(root_table)
 
         # Traverse child tables using BFS
-        queue = deque([root_table])
+        queue = deque([root_table.name])
         while queue:
-            current_table = queue.popleft()
+            current_table_name = queue.popleft()
 
             child_tables = sorted(
                 (
                     table
                     for table in generator.tables
                     if any(
-                        fk.referenced_table == current_table.name and fk.is_context for fk in table.foreign_keys or []
+                        fk.referenced_table == current_table_name and fk.is_context for fk in table.foreign_keys or []
                     )
                 ),
                 key=lambda t: t.name,
@@ -179,7 +179,7 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
 
             for child_table in child_tables:
                 add_generation_steps(child_table)
-                queue.append(child_table)
+                queue.append(child_table.name)
 
     # Add last common step(s)
     if generate_steps:
