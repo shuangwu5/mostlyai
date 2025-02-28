@@ -56,6 +56,7 @@ def do_test_connection(connector: Connector) -> bool:
         raise HTTPException(status_code=400, detail=str(e))
     return True
 
+
 def _data_tables_to_table_schemas(
     schema: Schema,
     ordered_table_names: list[str],
@@ -106,6 +107,7 @@ def _collapse_table_schemas(table_schemas: list[TableSchema]) -> TableSchema:
         table_schema = table_schemas[0]
         table_schema.children = table_schemas[1:]
         return table_schema
+
 
 def location_schema(connector: Connector, location: str, include_children: bool = False) -> TableSchema:
     container = create_container_from_connector(connector)

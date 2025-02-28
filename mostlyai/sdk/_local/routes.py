@@ -67,7 +67,6 @@ from mostlyai.sdk._local.storage import (
     create_zip_in_memory,
     write_connector_to_json,
 )
-from mostlyai.sdk._data.file.utils import read_data_table_from_path
 
 
 class Routes:
