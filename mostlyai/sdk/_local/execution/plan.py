@@ -133,6 +133,7 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
 
 def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool = False) -> ExecutionPlan:
     execution_plan = ExecutionPlan(tasks=[])
+    sync_task = execution_plan.add_task(TaskType.sync)
     generate_task_type = TaskType.probe if is_probe else TaskType.generate
     finalize_step_code = StepCode.finalize_probing if is_probe else StepCode.finalize_generation
     generate_steps = []
@@ -185,6 +186,7 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
         generate_steps.append(Step(step_code=finalize_step_code))
         if not is_probe:
             generate_steps.append(Step(step_code=StepCode.deliver_data))
-        execution_plan.add_task_with_steps(generate_task_type, steps=generate_steps)
+        generate_task = execution_plan.add_task_with_steps(generate_task_type, steps=generate_steps, parent=sync_task)
+        execution_plan.add_task(TaskType.sync, parent=generate_task)
 
     return execution_plan
