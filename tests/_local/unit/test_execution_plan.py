@@ -80,9 +80,10 @@ def test_make_synthetic_dataset_execution_plan():
     execution_plan = make_synthetic_dataset_execution_plan(generator)
 
     expected_execution_plan = ExecutionPlan(tasks=[])
-    expected_execution_plan.add_task_with_steps(
+    sync_task = expected_execution_plan.add_task(TaskType.sync)
+    generate_task = expected_execution_plan.add_task_with_steps(
         TaskType.generate,
-        parent=None,
+        parent=sync_task,
         steps=[
             Step(step_code=StepCode.generate_data_tabular, target_table_name="admins"),
             Step(step_code=StepCode.create_data_report_tabular, target_table_name="admins"),
@@ -100,6 +101,7 @@ def test_make_synthetic_dataset_execution_plan():
             Step(step_code=StepCode.deliver_data),
         ],
     )
+    expected_execution_plan.add_task(TaskType.sync, parent=generate_task)
 
     assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)
     for actual, expected in zip(execution_plan.tasks, expected_execution_plan.tasks):
@@ -223,15 +225,17 @@ def test_make_synthetic_dataset_execution_plan_with_probe():
     execution_plan = make_synthetic_dataset_execution_plan(config, is_probe=True)
 
     expected_execution_plan = ExecutionPlan(tasks=[])
-    expected_execution_plan.add_task_with_steps(
+    sync_task = expected_execution_plan.add_task(TaskType.sync)
+    generate_task = expected_execution_plan.add_task_with_steps(
         TaskType.probe,
-        parent=None,
+        parent=sync_task,
         steps=[
             Step(step_code=StepCode.generate_data_tabular, target_table_name="users"),
             Step(step_code=StepCode.generate_data_language, target_table_name="posts"),
             Step(step_code=StepCode.finalize_probing),
         ],
     )
+    expected_execution_plan.add_task(TaskType.sync, parent=generate_task)
 
     assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)
     for actual, expected in zip(execution_plan.tasks, expected_execution_plan.tasks):
