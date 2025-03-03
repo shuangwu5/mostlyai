@@ -69,7 +69,7 @@ class Step(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     step_code: StepCode
-    target_table_name: str | None = Field(None, alias="targetTableName", title="Target Table Name")
+    target_table_name: str | None = Field(None, title="Target Table Name")
 
 
 class Task(BaseModel):
