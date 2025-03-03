@@ -68,6 +68,7 @@ def has_language_model(table: SourceTable) -> bool:
 class Step(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     step_code: StepCode
     target_table_name: str | None = Field(None, title="Target Table Name")
 
