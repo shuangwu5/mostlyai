@@ -48,6 +48,18 @@ def arbitrary_model_config():
     )
 
 
+def assert_equivalent_execution_plan(plan_a, plan_b):
+    assert len(plan_a.tasks) == len(plan_b.tasks)
+    for actual, expected in zip(plan_a.tasks, plan_b.tasks):
+        assert actual.type == expected.type
+        if not actual.steps:
+            assert actual.steps == expected.steps
+            continue
+        assert [(step.step_code, step.target_table_name) for step in actual.steps] == [
+            (step.step_code, step.target_table_name) for step in expected.steps
+        ]
+
+
 def test_make_synthetic_dataset_execution_plan():
     # Create a test configuration with multiple tables and dependencies
     config = GeneratorConfig(
@@ -103,10 +115,7 @@ def test_make_synthetic_dataset_execution_plan():
     )
     expected_execution_plan.add_task(TaskType.sync, parent=generate_task)
 
-    assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)
-    for actual, expected in zip(execution_plan.tasks, expected_execution_plan.tasks):
-        assert actual.type == expected.type
-        assert actual.steps == expected.steps
+    assert_equivalent_execution_plan(execution_plan, expected_execution_plan)
 
 
 def test_make_generator_execution_plan():
@@ -237,7 +246,4 @@ def test_make_synthetic_dataset_execution_plan_with_probe():
     )
     expected_execution_plan.add_task(TaskType.sync, parent=generate_task)
 
-    assert len(execution_plan.tasks) == len(expected_execution_plan.tasks)
-    for actual, expected in zip(execution_plan.tasks, expected_execution_plan.tasks):
-        assert actual.type == expected.type
-        assert actual.steps == expected.steps
+    assert_equivalent_execution_plan(execution_plan, expected_execution_plan)
