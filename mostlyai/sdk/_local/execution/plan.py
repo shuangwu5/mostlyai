@@ -14,7 +14,8 @@
 
 from pydantic import BaseModel, Field, ConfigDict
 from collections import deque
-from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType, ModelType
+from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType, ModelType, \
+    SyntheticDataset
 import uuid
 
 TABULAR_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith(ModelType.tabular)] + [
@@ -27,6 +28,8 @@ TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.analyze_training_data,
     StepCode.encode_training_data,
     StepCode.train_model,
+]
+TRAINING_TASK_STEPS_REPORT: list[StepCode] = [
     StepCode.generate_model_report_data,
     StepCode.create_model_report,
 ]
@@ -35,6 +38,8 @@ FINALIZE_TRAINING_TASK_STEPS: list[StepCode] = [
 ]
 GENERATION_TASK_STEPS: list[StepCode] = [
     StepCode.generate_data,
+]
+GENERATION_TASK_STEPS_REPORTS: list[StepCode] = [
     StepCode.create_data_report,
 ]
 FINALIZE_GENERATION_TASK_STEPS: list[StepCode] = [
@@ -47,7 +52,6 @@ PROBING_TASK_STEPS: list[StepCode] = [
 FINALIZE_PROBING_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_probing,
 ]
-
 
 def _get_keys(table: SourceTable) -> list[str]:
     keys = [fk.column for fk in (table.foreign_keys or [])]
@@ -77,15 +81,15 @@ class Task(BaseModel):
 class ExecutionPlan(BaseModel):
     tasks: list[Task]
 
-    def add_task(self, task_type: TaskType, parent: Task | None = None, target_table_name: str | None = None) -> Task:
+    def add_task(self, task_type: TaskType, parent: Task | None = None, target_table_name: str | None = None, create_report: bool = False) -> Task:
         def get_steps(task_type: TaskType) -> list[StepCode] | None:
             match task_type:
                 case TaskType.train_tabular | TaskType.train_language:
-                    return TRAINING_TASK_STEPS
+                    return TRAINING_TASK_STEPS + (TRAINING_TASK_STEPS_REPORT if create_report else [])
                 case TaskType.finalize_training:
                     return FINALIZE_TRAINING_TASK_STEPS
                 case TaskType.generate_tabular | TaskType.generate_language:
-                    return GENERATION_TASK_STEPS
+                    return GENERATION_TASK_STEPS + (GENERATION_TASK_STEPS_REPORTS if create_report else [])
                 case TaskType.finalize_generation:
                     return FINALIZE_GENERATION_TASK_STEPS
                 case TaskType.probe_tabular | TaskType.probe_language:
@@ -111,9 +115,9 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
     sync_task = execution_plan.add_task(TaskType.sync)
     for table in generator.tables:
         if has_tabular_model(table):
-            execution_plan.add_task(TaskType.train_tabular, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(TaskType.train_tabular, parent=sync_task, target_table_name=table.name, create_report=table.tabular_model_configuration.enable_model_report)
         if has_language_model(table):
-            execution_plan.add_task(TaskType.train_language, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(TaskType.train_language, parent=sync_task, target_table_name=table.name, create_report=table.language_model_configuration.enable_model_report)
     execution_plan.add_task(TaskType.sync)
     # post_training_sync = execution_plan.add_task(TaskType.sync)
     # finalize_task = execution_plan.add_task(TaskType.finalize_training, parent=post_training_sync)
@@ -121,8 +125,9 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
     return execution_plan
 
 
-def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool = False) -> ExecutionPlan:
+def make_synthetic_dataset_execution_plan(synthetic_dataset: SyntheticDataset, generator: Generator, is_probe: bool = False) -> ExecutionPlan:
     execution_plan = ExecutionPlan(tasks=[])
+    data_reports_map = {table.name: table.configuration.enable_data_report for table in synthetic_dataset.tables}
     generate_tabular_task_type = TaskType.probe_tabular if is_probe else TaskType.generate_tabular
     generate_language_task_type = TaskType.probe_language if is_probe else TaskType.generate_language
     finalize_task_type = TaskType.finalize_probing if is_probe else TaskType.finalize_generation
@@ -141,13 +146,13 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
     for root_table in sorted(root_tables, key=lambda t: t.name):
         if has_tabular_model(root_table):
             generate_task = execution_plan.add_task(
-                generate_tabular_task_type, parent=sync_task, target_table_name=root_table.name
+                generate_tabular_task_type, parent=sync_task, target_table_name=root_table.name, create_report=data_reports_map[root_table.name]
             )
         else:
             generate_task = sync_task
         if has_language_model(root_table):
             generate_task = execution_plan.add_task(
-                generate_language_task_type, parent=generate_task, target_table_name=root_table.name
+                generate_language_task_type, parent=generate_task, target_table_name=root_table.name, create_report=data_reports_map[root_table.name]
             )
 
         # Traverse child tables in tree level order traversal
@@ -165,11 +170,11 @@ def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool =
                 generate_task = parent_task
                 if has_tabular_model(child_table):
                     generate_task = execution_plan.add_task(
-                        generate_tabular_task_type, parent=generate_task, target_table_name=child_table.name
+                        generate_tabular_task_type, parent=generate_task, target_table_name=child_table.name, create_report=data_reports_map[child_table.name]
                     )
                 if has_language_model(child_table):
                     generate_task = execution_plan.add_task(
-                        generate_language_task_type, parent=generate_task, target_table_name=child_table.name
+                        generate_language_task_type, parent=generate_task, target_table_name=child_table.name, create_report=data_reports_map[child_table.name]
                     )
 
                 queue.append((child_table.name, generate_task))

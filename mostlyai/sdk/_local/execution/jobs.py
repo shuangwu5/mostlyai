@@ -573,7 +573,7 @@ def execute_generation_job(synthetic_dataset_id: str, home_dir: Path):
 
     _mark_in_progress(resource=synthetic_dataset, resource_dir=synthetic_dataset_dir)
     # PLAN
-    plan = make_synthetic_dataset_execution_plan(generator)
+    plan = make_synthetic_dataset_execution_plan(synthetic_dataset, generator)
     # EXECUTE
     execution = Execution(
         execution_plan=plan,
