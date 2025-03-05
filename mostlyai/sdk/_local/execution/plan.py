@@ -34,6 +34,8 @@ TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.analyze_training_data,
     StepCode.encode_training_data,
     StepCode.train_model,
+]
+TRAINING_TASK_REPORT_STEPS: list[StepCode] = [
     StepCode.generate_model_report_data,
     StepCode.create_model_report,
 ]
@@ -42,12 +44,14 @@ FINALIZE_TRAINING_TASK_STEPS: list[StepCode] = [
 ]
 GENERATION_TASK_TABULAR_STEPS: list[StepCode] = [
     StepCode.generate_data_tabular,
-    StepCode.create_data_report_tabular,
 ]
 GENERATION_TASK_LANGUAGE_STEPS: list[StepCode] = [
     StepCode.generate_data_language,
-    StepCode.create_data_report_language,
 ]
+GENERATION_TASK_REPORT_STEPS: set[StepCode] = {
+    StepCode.create_data_report_tabular,
+    StepCode.create_data_report_language,
+}
 MODEL_TYPE_STEPS_MAP = {
     ModelType.tabular: GENERATION_TASK_TABULAR_STEPS,
     ModelType.language: GENERATION_TASK_LANGUAGE_STEPS,
@@ -94,11 +98,20 @@ class Task(BaseModel):
 class ExecutionPlan(BaseModel):
     tasks: list[Task]
 
-    def add_task(self, task_type: TaskType, parent: Task | None = None, target_table_name: str | None = None) -> Task:
+    def add_task(
+        self,
+        task_type: TaskType,
+        parent: Task | None = None,
+        target_table_name: str | None = None,
+        include_report: bool = True,
+    ) -> Task:
         def get_steps(task_type: TaskType) -> list[Step] | None:
             match task_type:
                 case TaskType.train_tabular | TaskType.train_language:
-                    return [Step(step_code=code) for code in TRAINING_TASK_STEPS]
+                    return [
+                        Step(step_code=code)
+                        for code in TRAINING_TASK_STEPS + (TRAINING_TASK_REPORT_STEPS if include_report else [])
+                    ]
                 case TaskType.finalize_training:
                     return [Step(step_code=code) for code in FINALIZE_TRAINING_TASK_STEPS]
                 case _:
@@ -130,9 +143,19 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
     sync_task = execution_plan.add_task(TaskType.sync)
     for table in generator.tables:
         if has_tabular_model(table):
-            execution_plan.add_task(TaskType.train_tabular, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(
+                TaskType.train_tabular,
+                parent=sync_task,
+                target_table_name=table.name,
+                include_report=table.tabular_model_configuration.enable_model_report,
+            )
         if has_language_model(table):
-            execution_plan.add_task(TaskType.train_language, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(
+                TaskType.train_language,
+                parent=sync_task,
+                target_table_name=table.name,
+                include_report=table.language_model_configuration.enable_model_report,
+            )
     execution_plan.add_task(TaskType.sync)
     # post_training_sync = execution_plan.add_task(TaskType.sync)
     # finalize_task = execution_plan.add_task(TaskType.finalize_training, parent=post_training_sync)
