@@ -16,7 +16,7 @@ import uuid
 import zipfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal, Any
+from typing import Literal
 
 import pandas as pd
 
