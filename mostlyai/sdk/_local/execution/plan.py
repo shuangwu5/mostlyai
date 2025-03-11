@@ -11,10 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from pydantic import BaseModel, Field, ConfigDict
 from collections import deque
-from mostlyai.sdk.domain import ModelEncodingType, Generator, SourceTable, StepCode, TaskType, ModelType
+from mostlyai.sdk.domain import (
+    ModelEncodingType,
+    Generator,
+    SourceTable,
+    StepCode,
+    TaskType,
+    ModelType,
+    SyntheticDataset,
+)
 import uuid
 
 TABULAR_MODEL_ENCODING_TYPES = [v for v in ModelEncodingType if v.startswith(ModelType.tabular)] + [
@@ -27,25 +34,17 @@ TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.analyze_training_data,
     StepCode.encode_training_data,
     StepCode.train_model,
+]
+TRAINING_TASK_REPORT_STEPS: list[StepCode] = [
     StepCode.generate_model_report_data,
     StepCode.create_model_report,
 ]
 FINALIZE_TRAINING_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_training,
 ]
-GENERATION_TASK_STEPS: list[StepCode] = [
-    StepCode.generate_data,
-    StepCode.create_data_report,
-]
 FINALIZE_GENERATION_TASK_STEPS: list[StepCode] = [
     StepCode.finalize_generation,
     StepCode.deliver_data,
-]
-PROBING_TASK_STEPS: list[StepCode] = [
-    StepCode.generate_data,
-]
-FINALIZE_PROBING_TASK_STEPS: list[StepCode] = [
-    StepCode.finalize_probing,
 ]
 
 
@@ -64,6 +63,23 @@ def has_language_model(table: SourceTable) -> bool:
     return table.language_model_configuration is not None
 
 
+def get_model_type_generation_steps_map(include_report: bool) -> dict[ModelType, list[StepCode]]:
+    return {
+        ModelType.tabular: [StepCode.generate_data_tabular]
+        + ([StepCode.create_data_report_tabular] if include_report else []),
+        ModelType.language: [StepCode.generate_data_language]
+        + ([StepCode.create_data_report_language] if include_report else []),
+    }
+
+
+class Step(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    step_code: StepCode = Field(alias="stepCode")
+    target_table_name: str | None = Field(None, alias="targetTableName", title="Target Table Name")
+
+
 class Task(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -71,27 +87,28 @@ class Task(BaseModel):
     parent_task_id: str | None = Field(None, alias="parentTaskId", title="Parent Task Id")
     target_table_name: str | None = Field(None, alias="targetTableName", title="Target Table Name")
     type: TaskType
-    steps: list[StepCode] | None
+    steps: list[Step] | None
 
 
 class ExecutionPlan(BaseModel):
     tasks: list[Task]
 
-    def add_task(self, task_type: TaskType, parent: Task | None = None, target_table_name: str | None = None) -> Task:
-        def get_steps(task_type: TaskType) -> list[StepCode] | None:
+    def add_task(
+        self,
+        task_type: TaskType,
+        parent: Task | None = None,
+        target_table_name: str | None = None,
+        include_report: bool = True,
+    ) -> Task:
+        def get_steps(task_type: TaskType) -> list[Step] | None:
             match task_type:
                 case TaskType.train_tabular | TaskType.train_language:
-                    return TRAINING_TASK_STEPS
+                    return [
+                        Step(step_code=code)
+                        for code in TRAINING_TASK_STEPS + (TRAINING_TASK_REPORT_STEPS if include_report else [])
+                    ]
                 case TaskType.finalize_training:
-                    return FINALIZE_TRAINING_TASK_STEPS
-                case TaskType.generate_tabular | TaskType.generate_language:
-                    return GENERATION_TASK_STEPS
-                case TaskType.finalize_generation:
-                    return FINALIZE_GENERATION_TASK_STEPS
-                case TaskType.probe_tabular | TaskType.probe_language:
-                    return PROBING_TASK_STEPS
-                case TaskType.finalize_probing:
-                    return FINALIZE_PROBING_TASK_STEPS
+                    return [Step(step_code=code) for code in FINALIZE_TRAINING_TASK_STEPS]
                 case _:
                     return None
 
@@ -105,15 +122,35 @@ class ExecutionPlan(BaseModel):
         self.tasks.append(task)
         return task
 
+    def add_task_with_steps(self, task_type: TaskType, parent: Task | None = None, steps: list[Step] = None) -> Task:
+        task = Task(
+            id=str(uuid.uuid4()),
+            type=task_type,
+            parent_task_id=parent.id if parent else None,
+            steps=steps or [],
+        )
+        self.tasks.append(task)
+        return task
+
 
 def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
     execution_plan = ExecutionPlan(tasks=[])
     sync_task = execution_plan.add_task(TaskType.sync)
     for table in generator.tables:
         if has_tabular_model(table):
-            execution_plan.add_task(TaskType.train_tabular, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(
+                TaskType.train_tabular,
+                parent=sync_task,
+                target_table_name=table.name,
+                include_report=table.tabular_model_configuration.enable_model_report,
+            )
         if has_language_model(table):
-            execution_plan.add_task(TaskType.train_language, parent=sync_task, target_table_name=table.name)
+            execution_plan.add_task(
+                TaskType.train_language,
+                parent=sync_task,
+                target_table_name=table.name,
+                include_report=table.language_model_configuration.enable_model_report,
+            )
     execution_plan.add_task(TaskType.sync)
     # post_training_sync = execution_plan.add_task(TaskType.sync)
     # finalize_task = execution_plan.add_task(TaskType.finalize_training, parent=post_training_sync)
@@ -121,59 +158,69 @@ def make_generator_execution_plan(generator: Generator) -> ExecutionPlan:
     return execution_plan
 
 
-def make_synthetic_dataset_execution_plan(generator: Generator, is_probe: bool = False) -> ExecutionPlan:
+def make_synthetic_dataset_execution_plan(
+    generator: Generator, synthetic_dataset: SyntheticDataset | None = None, is_probe: bool = False
+) -> ExecutionPlan:
     execution_plan = ExecutionPlan(tasks=[])
-    generate_tabular_task_type = TaskType.probe_tabular if is_probe else TaskType.generate_tabular
-    generate_language_task_type = TaskType.probe_language if is_probe else TaskType.generate_language
-    finalize_task_type = TaskType.finalize_probing if is_probe else TaskType.finalize_generation
     sync_task = execution_plan.add_task(TaskType.sync)
-    root_tables = [table for table in generator.tables if not any(fk.is_context for fk in table.foreign_keys or [])]
+    generate_task_type = TaskType.probe if is_probe else TaskType.generate
+    finalize_step_code = StepCode.finalize_probing if is_probe else StepCode.finalize_generation
+    generate_steps = []
 
-    def table_has_context_relation_to(table: SourceTable, parent_table_name: str) -> bool:
-        if table.foreign_keys is not None and any(
-            foreign_key.referenced_table == parent_table_name and foreign_key.is_context
-            for foreign_key in table.foreign_keys
-        ):
-            return True
-        return False
+    def add_generation_steps(table: SourceTable):
+        if synthetic_dataset:
+            synthetic_table = next(t for t in synthetic_dataset.tables if t.name == table.name)
+            enable_data_report = synthetic_table.configuration.enable_data_report
+        else:
+            enable_data_report = True
+        if has_tabular_model(table):
+            steps = [Step(step_code=StepCode.generate_data_tabular, target_table_name=table.name)]
+            if not is_probe and enable_data_report:
+                steps.append(Step(step_code=StepCode.create_data_report_tabular, target_table_name=table.name))
+            generate_steps.extend(steps)
+
+        if has_language_model(table):
+            steps = [Step(step_code=StepCode.generate_data_language, target_table_name=table.name)]
+            if not is_probe and enable_data_report:
+                steps.append(Step(step_code=StepCode.create_data_report_language, target_table_name=table.name))
+            generate_steps.extend(steps)
+
+    # Identify root tables (tables without a foreign key referencing them)
+    root_tables = sorted(
+        (table for table in generator.tables if not any(fk.is_context for fk in table.foreign_keys or [])),
+        key=lambda t: t.name,
+    )
 
     # Process each root table and its subtree
-    for root_table in sorted(root_tables, key=lambda t: t.name):
-        if has_tabular_model(root_table):
-            generate_task = execution_plan.add_task(
-                generate_tabular_task_type, parent=sync_task, target_table_name=root_table.name
-            )
-        else:
-            generate_task = sync_task
-        if has_language_model(root_table):
-            generate_task = execution_plan.add_task(
-                generate_language_task_type, parent=generate_task, target_table_name=root_table.name
-            )
+    for root_table in root_tables:
+        add_generation_steps(root_table)
 
-        # Traverse child tables in tree level order traversal
+        # Traverse child tables using BFS
         queue = deque([root_table.name])
         while queue:
             current_table_name = queue.popleft()
 
-            # Find child tables
             child_tables = sorted(
-                [table for table in generator.tables if table_has_context_relation_to(table, current_table_name)],
+                (
+                    table
+                    for table in generator.tables
+                    if any(
+                        fk.referenced_table == current_table_name and fk.is_context for fk in table.foreign_keys or []
+                    )
+                ),
                 key=lambda t: t.name,
             )
-            # Process each child table
-            for child_table in child_tables:
-                if has_tabular_model(child_table):
-                    generate_task = execution_plan.add_task(
-                        generate_tabular_task_type, parent=generate_task, target_table_name=child_table.name
-                    )
-                if has_language_model(child_table):
-                    generate_task = execution_plan.add_task(
-                        generate_language_task_type, parent=generate_task, target_table_name=child_table.name
-                    )
 
+            for child_table in child_tables:
+                add_generation_steps(child_table)
                 queue.append(child_table.name)
 
-    post_generation_sync_task = execution_plan.add_task(TaskType.sync)
-    finalize_task = execution_plan.add_task(finalize_task_type, parent=post_generation_sync_task)
-    execution_plan.add_task(TaskType.sync, parent=finalize_task)
+    # Add last common step(s)
+    if generate_steps:
+        generate_steps.append(Step(step_code=finalize_step_code))
+        if not is_probe:
+            generate_steps.append(Step(step_code=StepCode.deliver_data))
+        generate_task = execution_plan.add_task_with_steps(generate_task_type, steps=generate_steps, parent=sync_task)
+        execution_plan.add_task(TaskType.sync, parent=generate_task)
+
     return execution_plan

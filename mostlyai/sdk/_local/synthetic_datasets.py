@@ -24,8 +24,8 @@ from mostlyai.sdk._local.storage import (
 from mostlyai.sdk._local.execution.plan import (
     has_tabular_model,
     has_language_model,
-    GENERATION_TASK_STEPS,
     FINALIZE_GENERATION_TASK_STEPS,
+    get_model_type_generation_steps_map,
 )
 from mostlyai.sdk.client._base_utils import convert_to_df
 from mostlyai.sdk.domain import (
@@ -111,11 +111,14 @@ def create_synthetic_dataset(
     # copy ModelQA reports into synthetic dataset directory
     source_reports_dir = generator_dir / "ModelQAReports"
     dest_reports_dir = synthetic_dataset_dir / "ModelQAReports"
-    shutil.copytree(source_reports_dir, dest_reports_dir)
+    if source_reports_dir.exists():
+        shutil.copytree(source_reports_dir, dest_reports_dir)
 
     # create job progress
     progress_steps: list[ProgressStep] = []
     for table in generator.tables:
+        sd_table = next(t for t in config.tables if t.name == table.name)
+        steps_map = get_model_type_generation_steps_map(sd_table.configuration.enable_data_report)
         model_types = [
             model_type
             for model_type, check in [
@@ -125,12 +128,10 @@ def create_synthetic_dataset(
             if check
         ]
         for model_type in model_types:
-            for step in GENERATION_TASK_STEPS:
+            for step in steps_map[model_type]:
                 progress_steps.append(
                     ProgressStep(
-                        task_type=TaskType.generate_tabular
-                        if model_type == ModelType.tabular
-                        else TaskType.generate_language,
+                        task_type=TaskType.generate,
                         model_label=f"{table.name}:{model_type.value.lower()}",
                         step_code=step,
                         progress=ProgressValue(value=0, max=1),
@@ -140,7 +141,7 @@ def create_synthetic_dataset(
     for step in FINALIZE_GENERATION_TASK_STEPS:
         progress_steps.append(
             ProgressStep(
-                task_type=TaskType.finalize_generation,
+                task_type=TaskType.generate,
                 model_label=None,
                 step_code=step,
                 progress=ProgressValue(value=0, max=1),

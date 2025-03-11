@@ -20,7 +20,7 @@ import pandas as pd
 import rich
 from pydantic import Field, field_validator, model_validator
 
-from mostlyai.sdk.client._base_utils import convert_to_base64
+from mostlyai.sdk.client._base_utils import convert_to_base64, read_table_from_path
 from mostlyai.sdk.client.base import CustomBaseModel
 from mostlyai.sdk.domain import (
     JobProgress,
@@ -35,6 +35,7 @@ from mostlyai.sdk.domain import (
     ModelConfiguration,
     SyntheticDatasetReportType,
     ModelType,
+    SourceColumnConfig,
 )
 
 
@@ -397,6 +398,9 @@ class SourceTableConfig:
     @field_validator("data", mode="before")
     @classmethod
     def convert_data_before(cls, value):
+        # an empty (pd.DataFrame()) parquet in base64 is 800 chars. Assuming a shorter str is a URI
+        if isinstance(value, Path) or (isinstance(value, str) and len(value) < 512):
+            _, value = read_table_from_path(value)
         return (
             convert_to_base64(value)
             if isinstance(value, pd.DataFrame)
@@ -415,6 +419,7 @@ class SourceTableConfig:
                 (
                     isinstance(column, dict) and bool(column.get("included", True)),
                     isinstance(column, SourceColumn) and column.included,
+                    isinstance(column, SourceColumnConfig),
                 )
             )
             if is_included:
@@ -965,6 +970,19 @@ class _SyntheticTableConfigValidation(CustomBaseModel):
                 raise ValueError(f"Target column '{target_col}' cannot be a sensitive column")
         return validation
 
+    @model_validator(mode="after")
+    def validate_data_report_disabled_if_both_model_reports_disabled(cls, validation):
+        is_tabular_model_report_enabled = True
+        is_language_model_report_enabled = True
+        if validation.source_table.tabular_model_configuration is not None:
+            is_tabular_model_report_enabled = validation.source_table.tabular_model_configuration.enable_model_report
+        if validation.source_table.language_model_configuration is not None:
+            is_language_model_report_enabled = validation.source_table.language_model_configuration.enable_model_report
+        if not is_tabular_model_report_enabled and not is_language_model_report_enabled:
+            if validation.synthetic_table.configuration is not None:
+                validation.synthetic_table.configuration.enable_data_report = False
+        return validation
+
 
 class _SyntheticDataConfigValidation(CustomBaseModel):
     """
@@ -991,9 +1009,12 @@ class _SyntheticDataConfigValidation(CustomBaseModel):
         generator_table_map = {t.name: t for t in validation.generator.tables}
         synthetic_table_map = {t.name: t for t in validation.synthetic_config.tables or []}
 
-        extra_tables = set(synthetic_table_map.keys()) - set(generator_table_map.keys())
+        generator_tables = set(generator_table_map.keys())
+        extra_tables = set(synthetic_table_map.keys()) - generator_tables
         if extra_tables:
-            raise ValueError(f"Extra tables in synthetic config not present in generator: {extra_tables}")
+            raise ValueError(
+                f"Tables {extra_tables} are not present in the generator. Only {generator_tables} are available."
+            )
         return validation
 
     @model_validator(mode="after")
