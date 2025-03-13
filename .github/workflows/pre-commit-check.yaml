@@ -1,4 +1,4 @@
-name: Pre-Commit Check
+name: "mostlyai Pre-Commit Check"
 
 on: [workflow_call]
 
