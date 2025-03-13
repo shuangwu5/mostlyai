@@ -6,6 +6,8 @@ on:
 jobs:
   call-lint:
     uses: ./.github/workflows/lint-check.yaml
+  call-test-notebooks:
+    uses: ./.github/workflows/test-notebooks.yaml
   call-tests-cpu:
     uses: ./.github/workflows/run-tests-cpu.yaml
   call-test-gpu:

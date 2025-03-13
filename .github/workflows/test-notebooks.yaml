@@ -1,0 +1,38 @@
+name: mostlyai Test Tutorial Notebooks
+
+on:
+  workflow_dispatch:
+  workflow_call: 
+
+run-name: "Running Tutorial Notebooks from ${{ github.ref_name }}"
+
+jobs:
+  notebook-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Setup | Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        submodules: 'true'
+
+    - name: Setup | uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: false
+        python-version: '3.10'
+    
+    - name: Setup | Install Dependencies
+      run: |
+        uv pip install --system jupyter nbconvert
+
+    - name: Test | Run Notebooks
+      shell: bash
+      run: |
+        find docs/tutorials -name "*.ipynb" -type f -print0 | while IFS= read -r -d '' notebook; do
+          echo "Running notebook: $notebook"
+          jupyter nbconvert --to notebook --execute --inplace "$notebook"
+        done 
