@@ -4,15 +4,15 @@ on:
   push:
 
 jobs:
-  # call-lint:
-  #   uses: ./.github/workflows/lint-check.yaml
+  call-lint:
+    uses: ./.github/workflows/lint-check.yaml
+  call-tests-cpu:
+    uses: ./.github/workflows/run-tests-cpu.yaml
+  call-test-gpu:
+    if: |
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/') ||
+      contains(github.event.head_commit.message, '[gpu]')
+    uses: ./.github/workflows/run-tests-gpu.yaml
   call-test-notebooks:
     uses: ./.github/workflows/test-notebooks.yaml
-  # call-tests-cpu:
-  #   uses: ./.github/workflows/run-tests-cpu.yaml
-  # call-test-gpu:
-  #   if: |
-  #     github.ref == 'refs/heads/main' ||
-  #     startsWith(github.ref, 'refs/tags/') ||
-  #     contains(github.event.head_commit.message, '[gpu]')
-  #   uses: ./.github/workflows/run-tests-gpu.yaml
